@@ -3,6 +3,7 @@ package org.seattleoba.lambda;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;
+import com.amazonaws.services.lambda.runtime.events.models.dynamodb.AttributeValue;
 import com.amazonaws.services.lambda.runtime.events.models.dynamodb.Record;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.helix.domain.UserList;
@@ -38,9 +39,14 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
                 .filter(record -> !record.getEventName().equals("REMOVE"))
                 .map(Record::getDynamodb)
                 .forEach(streamRecord -> {
-                    if (streamRecord.getNewImage().containsKey(PURCHASER_NAME_FIELD) &&
-                            !streamRecord.getNewImage().get(PURCHASER_NAME_FIELD).isNULL() &&
-                            !streamRecord.getNewImage().get(PURCHASER_NAME_FIELD).getS().isEmpty()) {
+                    LOG.info("Extracted record {}", streamRecord);
+                    final Map<String, AttributeValue> newImage = streamRecord.getNewImage();
+                    if (Objects.isNull(newImage)) {
+                        LOG.error("Record {} is missing newImage field", streamRecord);
+                    }
+                    if (newImage.containsKey(PURCHASER_NAME_FIELD) &&
+                            !newImage.get(PURCHASER_NAME_FIELD).isNULL() &&
+                            !newImage.get(PURCHASER_NAME_FIELD).getS().isEmpty()) {
                         final Integer eventId = Integer.parseInt(streamRecord.getNewImage().get("event_id").getN());
                         final Integer ticketId = Integer.parseInt(streamRecord.getNewImage().get("id").getN());
                         final String userName = streamRecord.getNewImage().get(PURCHASER_NAME_FIELD).getS().toLowerCase(Locale.ROOT);

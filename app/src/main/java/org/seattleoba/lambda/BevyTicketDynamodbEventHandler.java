@@ -88,10 +88,11 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
                 if (twitchAccounts.containsKey(userName)) {
                     final TwitchAccount twitchAccount = twitchAccounts.get(userName);
                     LOG.info(
-                            "Adding registration for event {}, ticket {}, and user {}",
+                            "Adding registration for event {}, ticket {}, and user {} ({})",
                             eventId,
                             ticketId,
-                            twitchAccount.displayName());
+                            twitchAccount.displayName(),
+                            twitchAccount.id());
                 }
             }
         }

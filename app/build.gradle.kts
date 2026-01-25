@@ -29,6 +29,10 @@ dependencies {
     implementation("com.amazonaws:aws-lambda-java-core:1.4.0")
     implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
     runtimeOnly("com.amazonaws:aws-lambda-java-log4j2:1.5.1")
+    // AWS SDK
+    // DynamoDB Java client
+    implementation(platform("software.amazon.awssdk:bom:2.41.10"))
+    implementation("software.amazon.awssdk:dynamodb-enhanced")
     // twitch4j
     implementation("com.github.twitch4j:twitch4j:1.25.0")
     // Data
@@ -36,6 +40,8 @@ dependencies {
     // Mockito
     testImplementation("org.mockito:mockito-core:5.21.0")
     testImplementation("org.mockito:mockito-junit-jupiter:5.21.0")
+    // DynamoDB Local for unit testing
+    testImplementation("software.amazon.dynamodb:DynamoDBLocal:3.2.0")
 }
 
 testing {

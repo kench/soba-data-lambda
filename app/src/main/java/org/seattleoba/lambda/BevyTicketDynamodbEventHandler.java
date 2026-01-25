@@ -9,10 +9,14 @@ import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.helix.domain.UserList;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.seattleoba.ticketing.model.TwitchAccount;
+import org.seattleoba.data.dynamodb.bean.EventRegistration;
+import org.seattleoba.data.dynamodb.bean.TwitchAccount;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteResult;
+import software.amazon.awssdk.enhanced.dynamodb.model.WriteBatch;
 
 import javax.inject.Inject;
-import javax.inject.Named;
 import java.util.*;
 
 public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEvent, Void> {
@@ -20,14 +24,20 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
     private static final String PURCHASER_NAME_FIELD = "purchaser_name";
 
     private final TwitchClient twitchClient;
-    private final String accessToken;
+    private final DynamoDbEnhancedClient enhancedClient;
+    private final DynamoDbTable<EventRegistration> eventRegistrationTable;
+    private final DynamoDbTable<TwitchAccount> twitchAccountTable;
 
     @Inject
     public BevyTicketDynamodbEventHandler(
             final TwitchClient twitchClient,
-            @Named("accessToken") final String accessToken) {
+            final DynamoDbEnhancedClient enhancedClient,
+            final DynamoDbTable<EventRegistration> eventRegistrationTable,
+            final DynamoDbTable<TwitchAccount> twitchAccountTable) {
         this.twitchClient = twitchClient;
-        this.accessToken = accessToken;
+        this.enhancedClient = enhancedClient;
+        this.eventRegistrationTable = eventRegistrationTable;
+        this.twitchAccountTable = twitchAccountTable;
     }
 
     @Override
@@ -64,22 +74,19 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
         final Map<String, TwitchAccount> twitchAccounts = new HashMap<>();
 
         userList.getUsers().forEach(user -> {
-            final Integer userId = Integer.parseInt(user.getId());
-            final String broadcasterType = user.getBroadcasterType();
+            final TwitchAccount twitchAccount = new TwitchAccount();
             final String userName = user.getLogin();
-            final String displayName = user.getDisplayName();
-            final String userType = user.getType();
-            final String description = user.getDescription();
-            final Long createdAt = user.getCreatedAt().toEpochMilli();
-            twitchAccounts.put(userName, new TwitchAccount(
-                    userId,
-                    userName,
-                    displayName,
-                    userType,
-                    broadcasterType,
-                    description,
-                    createdAt));
+            twitchAccount.setId(Integer.parseInt(user.getId()));
+            twitchAccount.setUserName(userName);
+            twitchAccount.setDisplayName(user.getDisplayName());
+            twitchAccount.setUserType(user.getType());
+            twitchAccount.setBroadcasterType(user.getBroadcasterType());
+            twitchAccount.setDescription(user.getDescription());
+            twitchAccount.setCreatedAt(user.getCreatedAt().toEpochMilli());
+            twitchAccounts.put(userName, twitchAccount);
         });
+
+        final Set<EventRegistration> eventRegistrations = new HashSet<>();
 
         for (final Map.Entry<Integer, Set<Integer>> eventEntry : eventIdToTicketIds.entrySet()) {
             final Integer eventId = eventEntry.getKey();
@@ -87,16 +94,49 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
                 final String userName = ticketIdsToUserNames.get(ticketId);
                 if (twitchAccounts.containsKey(userName)) {
                     final TwitchAccount twitchAccount = twitchAccounts.get(userName);
-                    LOG.info(
-                            "Adding registration for event {}, ticket {}, and user {} ({})",
-                            eventId,
-                            ticketId,
-                            twitchAccount.displayName(),
-                            twitchAccount.id());
+                    final EventRegistration eventRegistration = new EventRegistration();
+                    eventRegistration.setEventId(eventId);
+                    eventRegistration.setId(ticketId);
+                    eventRegistration.setTwitchId(twitchAccount.getId());
+                    eventRegistrations.add(eventRegistration);
+                } else {
+                    LOG.error("Unable to find Twitch account ({}) for ticket {}", userName, ticketId);
                 }
             }
         }
 
+        persistTwitchAccounts(twitchAccounts.values());
+        persistEventRegistrations(eventRegistrations);
+
         return null;
+    }
+
+    private void persistTwitchAccounts(final Collection<TwitchAccount> twitchAccounts) {
+        WriteBatch.Builder<TwitchAccount> builder = WriteBatch.builder(TwitchAccount.class);
+        builder = builder.mappedTableResource(twitchAccountTable);
+        for (final TwitchAccount account : twitchAccounts) {
+            builder = builder.addPutItem(account);
+        }
+        final WriteBatch batch = builder.build();
+        final BatchWriteResult result = enhancedClient.batchWriteItem(b -> b.writeBatches(batch));
+        result.unprocessedPutItemsForTable(twitchAccountTable)
+                .forEach(account -> LOG.info(
+                        "Unable to write entry for Twitch account {} ({})",
+                        account.getDisplayName(),
+                        account.getId()));
+    }
+
+    private void persistEventRegistrations(final Collection<EventRegistration> eventRegistrations) {
+        WriteBatch.Builder<EventRegistration> builder = WriteBatch.builder(EventRegistration.class);
+        builder = builder.mappedTableResource(eventRegistrationTable);
+        for (final EventRegistration registration : eventRegistrations) {
+            builder = builder.addPutItem(registration);
+        }
+        final WriteBatch batch = builder.build();
+        final BatchWriteResult result = enhancedClient.batchWriteItem(b -> b.writeBatches(batch));
+        result.unprocessedPutItemsForTable(eventRegistrationTable)
+                .forEach(registration -> LOG.error(
+                        "Unable to write event registration for ticket ({})",
+                        registration.getId()));
     }
 }

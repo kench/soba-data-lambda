@@ -6,7 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;
 import org.seattleoba.lambda.dagger.DaggerLambdaComponent;
 import org.seattleoba.lambda.dagger.LambdaComponent;
 
-public class EventHandler implements RequestHandler<DynamodbEvent, Void> {
+public class EventRegistrationEventHandler implements RequestHandler<DynamodbEvent, Void> {
     private final LambdaComponent lambdaComponent = DaggerLambdaComponent.create();
 
     @Override

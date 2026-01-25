@@ -5,6 +5,14 @@ plugins {
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
+    // Add GitHub Packages
+    maven {
+        url = uri("https://maven.pkg.github.com/kench/soba-dataformats")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR")
+            password = System.getenv("GITHUB_TOKEN")
+        }
+    }
 }
 
 dependencies {
@@ -21,6 +29,13 @@ dependencies {
     implementation("com.amazonaws:aws-lambda-java-core:1.4.0")
     implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
     runtimeOnly("com.amazonaws:aws-lambda-java-log4j2:1.5.1")
+    // twitch4j
+    implementation("com.github.twitch4j:twitch4j:1.25.0")
+    // Data
+    implementation("org.seattleoba:soba-dataformats:1.0")
+    // Mockito
+    testImplementation("org.mockito:mockito-core:5.21.0")
+    testImplementation("org.mockito:mockito-junit-jupiter:5.21.0")
 }
 
 testing {

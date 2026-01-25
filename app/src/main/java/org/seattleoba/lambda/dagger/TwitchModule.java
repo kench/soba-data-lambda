@@ -1,5 +1,8 @@
 package org.seattleoba.lambda.dagger;
 
+import com.github.twitch4j.TwitchClient;
+import com.github.twitch4j.TwitchClientBuilder;
+import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
 import dagger.Module;
 import dagger.Provides;
 import org.apache.logging.log4j.LogManager;
@@ -15,6 +18,7 @@ import java.net.http.HttpResponse;
 @Module
 public class TwitchModule {
     private static final Logger LOG = LogManager.getLogger(TwitchModule.class);
+    private static final String REDIRECT_URL = "https://services.seattleoba.org/";
 
     @Provides
     @Singleton
@@ -57,5 +61,32 @@ public class TwitchModule {
             LOG.error("Unable to retrieve Twitch client secret", exception);
             throw new IllegalStateException(exception);
         }
+    }
+
+    @Provides
+    @Singleton
+    public TwitchClient providesTwitchClient(
+            @Named("clientId") final String clientId,
+            @Named("clientSecret") final String clientSecret) {
+        return TwitchClientBuilder.builder()
+                .withEnableHelix(true)
+                .withClientId(clientId)
+                .withClientSecret(clientSecret)
+                .build();
+    }
+
+    @Provides
+    @Singleton
+    public TwitchIdentityProvider providesTwitchIdentityProvider(
+            @Named("clientId") final String clientId,
+            @Named("clientSecret") final String clientSecret) {
+        return new TwitchIdentityProvider(clientId, clientSecret, REDIRECT_URL);
+    }
+
+    @Provides
+    @Singleton
+    @Named("accessToken")
+    public String getApplicationAccessToken(final TwitchIdentityProvider twitchIdentityProvider) {
+        return twitchIdentityProvider.getAppAccessToken().getAccessToken();
     }
 }

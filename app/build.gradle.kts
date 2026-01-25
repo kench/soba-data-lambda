@@ -10,9 +10,17 @@ repositories {
 dependencies {
     // This dependency is used by the application.
     implementation(libs.guava)
+    // Log4j2
+    implementation("org.apache.logging.log4j:log4j-api:2.25.3")
+    implementation("org.apache.logging.log4j:log4j-core:2.25.3")
+    // Dagger
+    implementation("com.google.dagger:dagger:2.53.1")
+    annotationProcessor("javax.annotation:javax.annotation-api:1.3.2")
+    annotationProcessor("com.google.dagger:dagger-compiler:2.53.1")
     // AWS Lambda
     implementation("com.amazonaws:aws-lambda-java-core:1.4.0")
     implementation("com.amazonaws:aws-lambda-java-events:3.16.1")
+    runtimeOnly("com.amazonaws:aws-lambda-java-log4j2:1.5.1")
 }
 
 testing {

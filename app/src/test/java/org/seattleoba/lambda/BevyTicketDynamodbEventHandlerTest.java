@@ -6,12 +6,12 @@ package org.seattleoba.lambda;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class BevyTicketDynamodbEventHandlerTest {
     @Test
     void eventHandler() {
-        BevyTicketDynamodbEventHandler classUnderTest = new BevyTicketDynamodbEventHandler();
+        BevyTicketDynamodbEventHandler classUnderTest = new BevyTicketDynamodbEventHandler("", "");
+
         assertDoesNotThrow(() -> classUnderTest.handleRequest(null, null));
     }
 }

@@ -39,13 +39,11 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
                 .filter(record -> !record.getEventName().equals("REMOVE"))
                 .map(Record::getDynamodb)
                 .forEach(streamRecord -> {
-                    LOG.info("Extracted record {}", streamRecord);
                     final Map<String, AttributeValue> newImage = streamRecord.getNewImage();
                     if (Objects.isNull(newImage)) {
                         LOG.error("Record {} is missing newImage field", streamRecord);
                     }
                     if (newImage.containsKey(PURCHASER_NAME_FIELD) &&
-                            !newImage.get(PURCHASER_NAME_FIELD).isNULL() &&
                             !newImage.get(PURCHASER_NAME_FIELD).getS().isEmpty()) {
                         final Integer eventId = Integer.parseInt(streamRecord.getNewImage().get("event_id").getN());
                         final Integer ticketId = Integer.parseInt(streamRecord.getNewImage().get("id").getN());

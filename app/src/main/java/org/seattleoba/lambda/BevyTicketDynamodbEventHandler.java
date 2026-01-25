@@ -105,13 +105,28 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
             }
         }
 
-        persistTwitchAccounts(twitchAccounts.values());
-        persistEventRegistrations(eventRegistrations);
+        try {
+            persistTwitchAccounts(twitchAccounts.values());
+        } catch (final Exception exception) {
+            LOG.error("Unable to update Twitch accounts", exception);
+            throw new RuntimeException(exception);
+        }
+
+        try {
+            persistEventRegistrations(eventRegistrations);
+        } catch (final Exception exception) {
+            LOG.error("Unable to update event registrations", exception);
+            throw new RuntimeException(exception);
+        }
 
         return null;
     }
 
     private void persistTwitchAccounts(final Collection<TwitchAccount> twitchAccounts) {
+        if (twitchAccounts.isEmpty()) {
+            return;
+        }
+
         WriteBatch.Builder<TwitchAccount> builder = WriteBatch.builder(TwitchAccount.class);
         builder = builder.mappedTableResource(twitchAccountTable);
         for (final TwitchAccount account : twitchAccounts) {
@@ -127,6 +142,10 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
     }
 
     private void persistEventRegistrations(final Collection<EventRegistration> eventRegistrations) {
+        if (eventRegistrations.isEmpty()) {
+            return;
+        }
+
         WriteBatch.Builder<EventRegistration> builder = WriteBatch.builder(EventRegistration.class);
         builder = builder.mappedTableResource(eventRegistrationTable);
         for (final EventRegistration registration : eventRegistrations) {

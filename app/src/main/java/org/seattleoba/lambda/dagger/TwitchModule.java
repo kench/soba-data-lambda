@@ -54,7 +54,6 @@ public class TwitchModule {
             secret = secret.substring(secret.indexOf("SecretString") + 15);
             secret = secret.substring(0, secret.indexOf("\""));
 
-            LOG.info("Successfully retrieved Twitch client secret");
             return secret;
 
         } catch (final Exception exception) {

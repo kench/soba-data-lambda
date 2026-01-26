@@ -33,6 +33,7 @@ dependencies {
     // DynamoDB Java client
     implementation(platform("software.amazon.awssdk:bom:2.41.10"))
     implementation("software.amazon.awssdk:dynamodb-enhanced")
+    implementation("software.amazon.awssdk:s3")
     // twitch4j
     implementation("com.github.twitch4j:twitch4j:1.25.0")
     // Data

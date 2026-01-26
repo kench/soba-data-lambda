@@ -1,4 +1,4 @@
-package org.seattleoba.lambda;
+package org.seattleoba.lambda.requesthandler;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;

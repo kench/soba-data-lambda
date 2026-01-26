@@ -1,10 +1,11 @@
-package org.seattleoba.lambda;
+package org.seattleoba.lambda.requesthandler;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;
-import com.amazonaws.services.lambda.runtime.events.models.dynamodb.AttributeValue;
+import com.amazonaws.services.lambda.runtime.events.StreamsEventResponse;
 import com.amazonaws.services.lambda.runtime.events.models.dynamodb.Record;
+import com.amazonaws.services.lambda.runtime.events.models.dynamodb.StreamRecord;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.helix.domain.UserList;
 import org.apache.logging.log4j.LogManager;
@@ -42,28 +43,29 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
 
     @Override
     public Void handleRequest(final DynamodbEvent input, final Context context) {
+        final List<StreamsEventResponse.BatchItemFailure> batchItemFailures = new ArrayList<>();
+        final StreamsEventResponse streamsEventResponse = StreamsEventResponse.builder()
+                .withBatchItemFailures(List.of(StreamsEventResponse.BatchItemFailure.builder()
+                        .build()))
+                .build();
         final Map<Integer, Set<Integer>> eventIdToTicketIds = new HashMap<>();
         final Map<Integer, String> ticketIdsToUserNames = new HashMap<>();
 
         input.getRecords().stream()
                 .filter(record -> !record.getEventName().equals("REMOVE"))
                 .map(Record::getDynamodb)
-                .forEach(streamRecord -> {
-                    final Map<String, AttributeValue> newImage = streamRecord.getNewImage();
-                    if (Objects.isNull(newImage)) {
-                        LOG.error("Record {} is missing newImage field", streamRecord);
+                .map(StreamRecord::getNewImage)
+                .filter(newImage -> newImage.containsKey(PURCHASER_NAME_FIELD))
+                .filter(newImage -> !newImage.get(PURCHASER_NAME_FIELD).getS().isEmpty())
+                .forEach(newImage -> {
+                    final Integer eventId = Integer.parseInt(newImage.get("event_id").getN());
+                    final Integer ticketId = Integer.parseInt(newImage.get("id").getN());
+                    final String userName = newImage.get(PURCHASER_NAME_FIELD).getS().toLowerCase(Locale.ROOT);
+                    if (!eventIdToTicketIds.containsKey(eventId)) {
+                        eventIdToTicketIds.put(eventId, new HashSet<>());
                     }
-                    if (newImage.containsKey(PURCHASER_NAME_FIELD) &&
-                            !newImage.get(PURCHASER_NAME_FIELD).getS().isEmpty()) {
-                        final Integer eventId = Integer.parseInt(streamRecord.getNewImage().get("event_id").getN());
-                        final Integer ticketId = Integer.parseInt(streamRecord.getNewImage().get("id").getN());
-                        final String userName = streamRecord.getNewImage().get(PURCHASER_NAME_FIELD).getS().toLowerCase(Locale.ROOT);
-                        if (!eventIdToTicketIds.containsKey(eventId)) {
-                            eventIdToTicketIds.put(eventId, new HashSet<>());
-                        }
-                        eventIdToTicketIds.get(eventId).add(ticketId);
-                        ticketIdsToUserNames.put(ticketId, userName);
-                    }
+                    eventIdToTicketIds.get(eventId).add(ticketId);
+                    ticketIdsToUserNames.put(ticketId, userName);
                 });
 
         final UserList userList = twitchClient.getHelix().getUsers(

@@ -2,7 +2,7 @@ package org.seattleoba.lambda.dagger;
 
 import dagger.Component;
 import org.seattleoba.data.dagger.DataModule;
-import org.seattleoba.lambda.BevyTicketDynamodbEventHandler;
+import org.seattleoba.lambda.requesthandler.BevyTicketDynamodbEventHandler;
 
 import javax.inject.Singleton;
 
@@ -11,6 +11,6 @@ import javax.inject.Singleton;
         AwsModule.class,
         DataModule.class,
         TwitchModule.class})
-public interface LambdaComponent {
+public interface EventHandlerLambdaComponent {
     BevyTicketDynamodbEventHandler eventHandler();
 }

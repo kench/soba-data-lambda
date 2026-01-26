@@ -3,11 +3,11 @@ package org.seattleoba.lambda;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;
-import org.seattleoba.lambda.dagger.DaggerLambdaComponent;
-import org.seattleoba.lambda.dagger.LambdaComponent;
+import org.seattleoba.lambda.dagger.DaggerEventHandlerLambdaComponent;
+import org.seattleoba.lambda.dagger.EventHandlerLambdaComponent;
 
 public class EventRegistrationEventHandler implements RequestHandler<DynamodbEvent, Void> {
-    private final LambdaComponent lambdaComponent = DaggerLambdaComponent.create();
+    private final EventHandlerLambdaComponent lambdaComponent = DaggerEventHandlerLambdaComponent.create();
 
     @Override
     public Void handleRequest(final DynamodbEvent input, final Context context) {

@@ -63,7 +63,7 @@ public class BevyTicketImportRequestHandler implements RequestHandler<BevyRoster
             bevyTicket.setPrice(new BigDecimal(ticket.price()));
             bevyTicket.setPurchaseDate(BevyDateUtil.toUnixEpochInSeconds(ticket.purchaseDate()));
             bevyTicket.setPurchaserName(ticket.purchaserName());
-            bevyTicket.setTicketType(ticket.ticketNumber());
+            bevyTicket.setTicketType(ticket.ticketType());
             return bevyTicket;
         }).forEach(ticket -> {
             final BevyTicket existingItem = bevyTicketDynamoDbTable.getItem(ticket);

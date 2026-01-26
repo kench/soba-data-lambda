@@ -57,6 +57,7 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
                 .map(StreamRecord::getNewImage)
                 .filter(newImage -> newImage.containsKey(PURCHASER_NAME_FIELD))
                 .filter(newImage -> !newImage.get(PURCHASER_NAME_FIELD).getS().isEmpty())
+                .filter(newImage -> newImage.get(PURCHASER_NAME_FIELD).getS().matches("^\\w+$"))
                 .forEach(newImage -> {
                     final Integer eventId = Integer.parseInt(newImage.get("event_id").getN());
                     final Integer ticketId = Integer.parseInt(newImage.get("id").getN());

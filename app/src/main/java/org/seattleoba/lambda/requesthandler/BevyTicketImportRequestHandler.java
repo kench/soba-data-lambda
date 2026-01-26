@@ -66,7 +66,9 @@ public class BevyTicketImportRequestHandler implements RequestHandler<BevyRoster
             } else {
                 bevyTicket.setPrice(new BigDecimal(0));
             }
-            bevyTicket.setPurchaseDate(BevyDateUtil.toUnixEpochInSeconds(ticket.purchaseDate()));
+            if (Objects.nonNull(ticket.purchaseDate()) && !ticket.purchaseDate().isEmpty()) {
+                bevyTicket.setPurchaseDate(BevyDateUtil.toUnixEpochInSeconds(ticket.purchaseDate()));
+            }
             bevyTicket.setPurchaserName(ticket.purchaserName());
             bevyTicket.setTicketType(ticket.ticketType());
             return bevyTicket;

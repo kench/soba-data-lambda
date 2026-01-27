@@ -59,7 +59,7 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
         while (eventIterator.hasNext()) {
             final Collection<String> sequenceNumbers = new HashSet<>();
             final Collection<SendMessageBatchRequestEntry> entries = new ArrayList<>();
-            while (eventIterator.hasNext() && entries.size() <= MAX_SQS_BATCH_SIZE) {
+            while (eventIterator.hasNext() && entries.size() < MAX_SQS_BATCH_SIZE) {
                 final BevyTicketEvent bevyTicketEvent = eventIterator.next();
                 final String sequenceNumber = ticketIdToSequenceNumber.get(bevyTicketEvent.ticketId());
                 try {

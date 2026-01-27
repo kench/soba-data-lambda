@@ -41,35 +41,35 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
     public StreamsEventResponse handleRequest(final DynamodbEvent input, final Context context) {
         final List<StreamsEventResponse.BatchItemFailure> batchItemFailures = new ArrayList<>();
 
-        final Map<Integer, String> ticketIdToMessageId = new HashMap<>();
+        final Map<Integer, String> ticketIdToSequenceNumber = new HashMap<>();
         final Set<BevyTicketEvent> bevyTicketEvents = new HashSet<>();
         input.getRecords().forEach(record -> {
             if (!record.getEventName().equals(REMOVE_EVENT_NAME)) {
-                final String messageId = record.getEventID();
+                final String sequenceNumber = record.getDynamodb().getSequenceNumber();
                 final Map<String, AttributeValue> newImage = record.getDynamodb().getNewImage();
                 final Integer eventId = Integer.parseInt(newImage.get(EVENT_ID_FIELD_NAME).getN());
                 final Integer ticketId = Integer.parseInt(newImage.get(ID_FIELD_NAME).getN());
                 final String purchaserName = newImage.get(PURCHASER_NAME_FIELD_NAME).getS();
                 bevyTicketEvents.add(new BevyTicketEvent(eventId, ticketId, purchaserName));
-                ticketIdToMessageId.put(ticketId, messageId);
+                ticketIdToSequenceNumber.put(ticketId, sequenceNumber);
             }
         });
 
         final Iterator<BevyTicketEvent> eventIterator = bevyTicketEvents.iterator();
         while (eventIterator.hasNext()) {
-            final Collection<String> messageIds = new HashSet<>();
+            final Collection<String> sequenceNumbers = new HashSet<>();
             final Collection<SendMessageBatchRequestEntry> entries = new ArrayList<>();
             while (eventIterator.hasNext() && entries.size() <= MAX_SQS_BATCH_SIZE) {
                 final BevyTicketEvent bevyTicketEvent = eventIterator.next();
-                final String messageId = ticketIdToMessageId.get(bevyTicketEvent.ticketId());
+                final String sequenceNumber = ticketIdToSequenceNumber.get(bevyTicketEvent.ticketId());
                 try {
                     entries.add(SendMessageBatchRequestEntry.builder()
                             .messageBody(objectMapper.writeValueAsString(bevyTicketEvent))
                             .build());
-                    messageIds.add(messageId);
+                    sequenceNumbers.add(sequenceNumber);
                 } catch (final Exception exception) {
                     LOG.error("Unable to serialize ticket {} to JSON", bevyTicketEvent, exception);
-                    batchItemFailures.add(new StreamsEventResponse.BatchItemFailure(messageId));
+                    batchItemFailures.add(new StreamsEventResponse.BatchItemFailure(sequenceNumber));
                 }
             }
 
@@ -80,8 +80,8 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
                         .build());
             } catch (final Exception exception) {
                 LOG.error("Unable to send message batch {} to SQS", entries, exception);
-                messageIds.forEach(messageId ->
-                        batchItemFailures.add(new StreamsEventResponse.BatchItemFailure(messageId)));
+                sequenceNumbers.forEach(sequenceNumber ->
+                        batchItemFailures.add(new StreamsEventResponse.BatchItemFailure(sequenceNumber)));
             }
         }
 

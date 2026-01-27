@@ -51,76 +51,88 @@ public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent
     public SQSBatchResponse handleRequest(final SQSEvent sqsEvent, final Context context) {
         final List<SQSBatchResponse.BatchItemFailure> batchItemFailures = new ArrayList<>();
 
-        for (final SQSEvent.SQSMessage message : sqsEvent.getRecords()) {
-            final String messageId = message.getMessageId();
-            final Integer ticketId;
-            final Integer eventId;
-            final String purchaserName;
-            try {
-                final BevyTicketEvent bevyTicketEvent =
-                        objectMapper.readValue(message.getBody(), BevyTicketEvent.class);
-                ticketId = bevyTicketEvent.ticketId();
-                eventId = bevyTicketEvent.eventId();
-                purchaserName = bevyTicketEvent.purchaserName();
-            } catch (final JsonProcessingException exception) {
-                LOG.error("Unable to parse message {}", messageId, exception);
-                batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
-                break;
-            }
+        try {
+            for (final SQSEvent.SQSMessage message : sqsEvent.getRecords()) {
+                final String messageId = message.getMessageId();
+                final BevyTicketEvent bevyTicketEvent;
 
-            final User user;
-            final String userName = purchaserName.toLowerCase();
-            try {
-                final UserList userList = twitchClient.getHelix().getUsers(
-                        null,
-                        null,
-                        Collections.singletonList(userName)).execute();
-                user = userList.getUsers().getFirst();
-            } catch (final Exception exception) {
-                LOG.error("Unable to retrieve Twitch user ID for user name {}", userName, exception);
-                batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
-                break;
-            }
-
-            final TwitchAccount twitchAccount = new TwitchAccount();
-            twitchAccount.setId(Integer.parseInt(user.getId()));
-            twitchAccount.setUserName(user.getLogin());
-            twitchAccount.setDisplayName(user.getDisplayName());
-            twitchAccount.setUserType(user.getType());
-            twitchAccount.setBroadcasterType(user.getBroadcasterType());
-            twitchAccount.setDescription(user.getDescription());
-            twitchAccount.setCreatedAt(user.getCreatedAt().toEpochMilli());
-            final EventRegistration eventRegistration = new EventRegistration();
-            eventRegistration.setEventId(eventId);
-            eventRegistration.setId(ticketId);
-            eventRegistration.setTwitchId(twitchAccount.getId());
-
-            try {
-                final TwitchAccount item = twitchAccountTable.getItem(twitchAccount);
-                if (Objects.isNull(item)) {
-                    twitchAccountTable.putItem(twitchAccount);
-                } else if (!twitchAccount.equals(item)) {
-                    twitchAccountTable.updateItem(twitchAccount);
+                LOG.info("Processing message {}", messageId);
+                try {
+                    bevyTicketEvent =
+                            objectMapper.readValue(message.getBody(), BevyTicketEvent.class);
+                } catch (final JsonProcessingException exception) {
+                    LOG.error("Unable to parse message {}", messageId, exception);
+                    batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
+                    break;
                 }
-            } catch (final Exception exception) {
-                LOG.error("Unable to update Twitch accounts", exception);
-                batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
-                break;
-            }
 
-            try {
-                final EventRegistration item = eventRegistrationTable.getItem(eventRegistration);
-                if (Objects.isNull(item)) {
-                    eventRegistrationTable.putItem(eventRegistration);
-                } else if (!eventRegistration.equals(item)) {
-                    eventRegistrationTable.updateItem(eventRegistration);
+                final Integer ticketId = bevyTicketEvent.ticketId();
+                final Integer eventId = bevyTicketEvent.eventId();
+                final String purchaserName = bevyTicketEvent.purchaserName();
+                LOG.info("Started processing ticket {}, event {}. purchaserName {}",
+                        ticketId,
+                        eventId,
+                        purchaserName);
+
+                final User user;
+                final String userName = purchaserName.toLowerCase();
+                LOG.info("Retrieving Twitch user account info for login {}", userName);
+                try {
+                    final UserList userList = twitchClient.getHelix().getUsers(
+                            null,
+                            null,
+                            Collections.singletonList(userName)).execute();
+                    user = userList.getUsers().getFirst();
+                } catch (final Exception exception) {
+                    LOG.error("Unable to retrieve Twitch user ID for user name {}", userName, exception);
+                    batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
+                    break;
                 }
-            } catch (final Exception exception) {
-                LOG.error("Unable to update event registrations", exception);
-                batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
-                break;
+
+                final TwitchAccount twitchAccount = new TwitchAccount();
+                twitchAccount.setId(Integer.parseInt(user.getId()));
+                twitchAccount.setUserName(user.getLogin());
+                twitchAccount.setDisplayName(user.getDisplayName());
+                twitchAccount.setUserType(user.getType());
+                twitchAccount.setBroadcasterType(user.getBroadcasterType());
+                twitchAccount.setDescription(user.getDescription());
+                twitchAccount.setCreatedAt(user.getCreatedAt().toEpochMilli());
+                final EventRegistration eventRegistration = new EventRegistration();
+                eventRegistration.setEventId(eventId);
+                eventRegistration.setId(ticketId);
+                eventRegistration.setTwitchId(twitchAccount.getId());
+
+                LOG.info("Persisting Twitch account information for {} ({})", user.getDisplayName(), user.getId());
+                try {
+                    final TwitchAccount item = twitchAccountTable.getItem(twitchAccount);
+                    if (Objects.isNull(item)) {
+                        twitchAccountTable.putItem(twitchAccount);
+                    } else if (!twitchAccount.equals(item)) {
+                        twitchAccountTable.updateItem(twitchAccount);
+                    }
+                } catch (final Exception exception) {
+                    LOG.error("Unable to persist Twitch account", exception);
+                    batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
+                    break;
+                }
+
+                try {
+                    final EventRegistration item = eventRegistrationTable.getItem(eventRegistration);
+                    if (Objects.isNull(item)) {
+                        eventRegistrationTable.putItem(eventRegistration);
+                    } else if (!eventRegistration.equals(item)) {
+                        eventRegistrationTable.updateItem(eventRegistration);
+                    }
+                } catch (final Exception exception) {
+                    LOG.error("Unable to update event registrations", exception);
+                    batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
+                    break;
+                }
             }
+        } catch (final Exception exception) {
+            LOG.info("Unexpected exception encountered", exception);
         }
+
 
         return SQSBatchResponse.builder()
                 .withBatchItemFailures(batchItemFailures)

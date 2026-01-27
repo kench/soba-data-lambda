@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequestEntry;
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchResponse;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -84,11 +85,14 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
             }
 
             try {
-                sqsClient.sendMessageBatch(SendMessageBatchRequest.builder()
+                final SendMessageBatchResponse response = sqsClient.sendMessageBatch(SendMessageBatchRequest.builder()
                         .entries(entries)
                         .queueUrl(SQS_QUEUE_URL)
                         .build());
-                LOG.info("Successfully sent batch of {} messages to SQS", entries.size());
+                response.failed()
+                        .forEach(error ->
+                                LOG.error("Error sending message: {}", error.message()));
+                LOG.info("Successfully sent batch of {} messages to SQS", response.successful().size());
             } catch (final Exception exception) {
                 LOG.error("Unable to send message batch {} to SQS", entries, exception);
                 sequenceNumbers.forEach(sequenceNumber ->

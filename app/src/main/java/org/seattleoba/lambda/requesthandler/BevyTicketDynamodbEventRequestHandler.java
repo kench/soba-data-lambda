@@ -68,14 +68,7 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
                 try {
                     entries.add(SendMessageBatchRequestEntry.builder()
                             .id(Integer.toString(bevyTicketEvent.ticketId()))
-                            .messageAttributes(Map.of(
-                                    EVENT_ID_FIELD_NAME, MessageAttributeValue.builder()
-                                            .stringValue(Integer.toString(bevyTicketEvent.eventId())).build(),
-                                    ID_FIELD_NAME, MessageAttributeValue.builder()
-                                            .stringValue(Integer.toString(bevyTicketEvent.ticketId())).build()
-                            ))
                             .messageBody(objectMapper.writeValueAsString(bevyTicketEvent))
-                            .messageGroupId(Integer.toString(bevyTicketEvent.eventId()))
                             .build());
                     sequenceNumbers.add(sequenceNumber);
                 } catch (final Exception exception) {
@@ -89,10 +82,11 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
                         .entries(entries)
                         .queueUrl(SQS_QUEUE_URL)
                         .build());
-                response.failed()
-                        .forEach(error ->
-                                LOG.error("Error sending message: {}", error.message()));
                 LOG.info("Successfully sent batch of {} messages to SQS", response.successful().size());
+                if (response.hasFailed()) {
+                    sequenceNumbers.forEach(sequenceNumber ->
+                            batchItemFailures.add(new StreamsEventResponse.BatchItemFailure(sequenceNumber)));
+                }
             } catch (final Exception exception) {
                 LOG.error("Unable to send message batch {} to SQS", entries, exception);
                 sequenceNumbers.forEach(sequenceNumber ->

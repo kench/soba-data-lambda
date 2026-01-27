@@ -10,6 +10,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.seattleoba.lambda.model.BevyTicketEvent;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequestEntry;
 
@@ -27,7 +28,6 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
 
     private final ObjectMapper objectMapper;
     private final SqsClient sqsClient;
-
 
     @Inject
     public BevyTicketDynamodbEventRequestHandler(
@@ -64,7 +64,15 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
                 final String sequenceNumber = ticketIdToSequenceNumber.get(bevyTicketEvent.ticketId());
                 try {
                     entries.add(SendMessageBatchRequestEntry.builder()
+                            .id(Integer.toString(bevyTicketEvent.ticketId()))
+                            .messageAttributes(Map.of(
+                                    EVENT_ID_FIELD_NAME, MessageAttributeValue.builder()
+                                            .stringValue(Integer.toString(bevyTicketEvent.eventId())).build(),
+                                    ID_FIELD_NAME, MessageAttributeValue.builder()
+                                            .stringValue(Integer.toString(bevyTicketEvent.ticketId())).build()
+                            ))
                             .messageBody(objectMapper.writeValueAsString(bevyTicketEvent))
+                            .messageGroupId(Integer.toString(bevyTicketEvent.eventId()))
                             .build());
                     sequenceNumbers.add(sequenceNumber);
                 } catch (final Exception exception) {

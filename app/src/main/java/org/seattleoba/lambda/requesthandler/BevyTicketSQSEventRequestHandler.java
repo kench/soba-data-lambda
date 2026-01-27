@@ -62,7 +62,7 @@ public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent
                         objectMapper.readValue(sqsMessage.getBody(), BevyTicketEvent.class);
                 final Integer eventId = bevyTicketEvent.eventId();
                 final Integer ticketId = bevyTicketEvent.ticketId();
-                final String userName = bevyTicketEvent.purchaserName();
+                final String userName = bevyTicketEvent.purchaserName().toLowerCase(Locale.ROOT);
                 if (!eventIdToTicketIds.containsKey(eventId)) {
                     eventIdToTicketIds.put(eventId, new HashSet<>());
                 }

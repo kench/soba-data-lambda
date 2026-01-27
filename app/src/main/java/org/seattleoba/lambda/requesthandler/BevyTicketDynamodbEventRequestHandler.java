@@ -56,8 +56,6 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
             }
         });
 
-        LOG.info("Retrieved {} records from DynamoDB", bevyTicketEvents.size());
-
         final Iterator<BevyTicketEvent> eventIterator = bevyTicketEvents.iterator();
         while (eventIterator.hasNext()) {
             final Collection<String> sequenceNumbers = new HashSet<>();
@@ -77,18 +75,18 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
                 }
             }
 
+            boolean batchFailure;
             try {
                 final SendMessageBatchResponse response = sqsClient.sendMessageBatch(SendMessageBatchRequest.builder()
                         .entries(entries)
                         .queueUrl(SQS_QUEUE_URL)
                         .build());
-                LOG.info("Successfully sent batch of {} messages to SQS", response.successful().size());
-                if (response.hasFailed()) {
-                    sequenceNumbers.forEach(sequenceNumber ->
-                            batchItemFailures.add(new StreamsEventResponse.BatchItemFailure(sequenceNumber)));
-                }
+                batchFailure = response.hasFailed();
             } catch (final Exception exception) {
                 LOG.error("Unable to send message batch {} to SQS", entries, exception);
+                batchFailure = true;
+            }
+            if (batchFailure) {
                 sequenceNumbers.forEach(sequenceNumber ->
                         batchItemFailures.add(new StreamsEventResponse.BatchItemFailure(sequenceNumber)));
             }

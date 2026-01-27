@@ -6,9 +6,6 @@
                     <pattern>%d{yyyy-MM-dd HH:mm:ss} %X{AWSRequestId} %-5p %c{1} - %m%n </pattern>
                 </PatternLayout>
             </LambdaTextFormat>
-            <LambdaJSONFormat>
-                <JsonTemplateLayout eventTemplateUri="classpath:LambdaLayout.json" />
-            </LambdaJSONFormat>
         </Lambda>
     </Appenders>
     <Loggers>

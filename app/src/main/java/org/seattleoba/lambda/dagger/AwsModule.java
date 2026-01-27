@@ -5,6 +5,7 @@ import dagger.Provides;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 import javax.inject.Singleton;
 
@@ -28,5 +29,11 @@ public class AwsModule {
     @Singleton
     public S3Client providesS3Client() {
         return S3Client.builder().build();
+    }
+
+    @Provides
+    @Singleton
+    public SqsClient providesSqsClient() {
+        return SqsClient.builder().build();
     }
 }

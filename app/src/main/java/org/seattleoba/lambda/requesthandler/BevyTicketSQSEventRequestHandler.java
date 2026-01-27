@@ -2,16 +2,20 @@ package org.seattleoba.lambda.requesthandler;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;
-import com.amazonaws.services.lambda.runtime.events.StreamsEventResponse;
-import com.amazonaws.services.lambda.runtime.events.models.dynamodb.Record;
-import com.amazonaws.services.lambda.runtime.events.models.dynamodb.StreamRecord;
+import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
+import com.amazonaws.services.lambda.runtime.events.SQSEvent;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.twitch4j.TwitchClient;
+import com.github.twitch4j.helix.domain.User;
 import com.github.twitch4j.helix.domain.UserList;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.seattleoba.data.dynamodb.bean.EventRegistration;
 import org.seattleoba.data.dynamodb.bean.TwitchAccount;
+import org.seattleoba.lambda.model.BevyTicketEvent;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteResult;
@@ -20,63 +24,91 @@ import software.amazon.awssdk.enhanced.dynamodb.model.WriteBatch;
 import javax.inject.Inject;
 import java.util.*;
 
-public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEvent, Void> {
-    private static final Logger LOG = LogManager.getLogger(BevyTicketDynamodbEventHandler.class);
-    private static final String PURCHASER_NAME_FIELD = "purchaser_name";
+public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent, SQSBatchResponse> {
+    private static final Logger LOG = LogManager.getLogger(BevyTicketSQSEventRequestHandler.class);
 
     private final TwitchClient twitchClient;
     private final DynamoDbEnhancedClient enhancedClient;
     private final DynamoDbTable<EventRegistration> eventRegistrationTable;
     private final DynamoDbTable<TwitchAccount> twitchAccountTable;
+    private final ObjectMapper objectMapper;
 
     @Inject
-    public BevyTicketDynamodbEventHandler(
+    public BevyTicketSQSEventRequestHandler(
             final TwitchClient twitchClient,
             final DynamoDbEnhancedClient enhancedClient,
             final DynamoDbTable<EventRegistration> eventRegistrationTable,
-            final DynamoDbTable<TwitchAccount> twitchAccountTable) {
+            final DynamoDbTable<TwitchAccount> twitchAccountTable,
+            final ObjectMapper objectMapper) {
         this.twitchClient = twitchClient;
         this.enhancedClient = enhancedClient;
         this.eventRegistrationTable = eventRegistrationTable;
         this.twitchAccountTable = twitchAccountTable;
+        this.objectMapper = objectMapper;
     }
 
     @Override
-    public Void handleRequest(final DynamodbEvent input, final Context context) {
-        final List<StreamsEventResponse.BatchItemFailure> batchItemFailures = new ArrayList<>();
-        final StreamsEventResponse streamsEventResponse = StreamsEventResponse.builder()
-                .withBatchItemFailures(List.of(StreamsEventResponse.BatchItemFailure.builder()
-                        .build()))
-                .build();
+    public SQSBatchResponse handleRequest(final SQSEvent sqsEvent, final Context context) {
+        final List<SQSBatchResponse.BatchItemFailure> batchItemFailures = new ArrayList<>();
+
+        final Map<Integer, String> ticketIdsToMessageIds = new HashMap<>();
         final Map<Integer, Set<Integer>> eventIdToTicketIds = new HashMap<>();
-        final Map<Integer, String> ticketIdsToUserNames = new HashMap<>();
+        final BiMap<Integer, String> ticketIdsToUserNames = HashBiMap.create();
 
-        input.getRecords().stream()
-                .filter(record -> !record.getEventName().equals("REMOVE"))
-                .map(Record::getDynamodb)
-                .map(StreamRecord::getNewImage)
-                .filter(newImage -> newImage.containsKey(PURCHASER_NAME_FIELD))
-                .filter(newImage -> !newImage.get(PURCHASER_NAME_FIELD).getS().isEmpty())
-                .filter(newImage -> newImage.get(PURCHASER_NAME_FIELD).getS().matches("^\\w+$"))
-                .forEach(newImage -> {
-                    final Integer eventId = Integer.parseInt(newImage.get("event_id").getN());
-                    final Integer ticketId = Integer.parseInt(newImage.get("id").getN());
-                    final String userName = newImage.get(PURCHASER_NAME_FIELD).getS().toLowerCase(Locale.ROOT);
-                    if (!eventIdToTicketIds.containsKey(eventId)) {
-                        eventIdToTicketIds.put(eventId, new HashSet<>());
-                    }
-                    eventIdToTicketIds.get(eventId).add(ticketId);
-                    ticketIdsToUserNames.put(ticketId, userName);
-                });
+        sqsEvent.getRecords().forEach(sqsMessage -> {
+            final String messageId = sqsMessage.getMessageId();
+            try {
+                final BevyTicketEvent bevyTicketEvent =
+                        objectMapper.readValue(sqsMessage.getBody(), BevyTicketEvent.class);
+                final Integer eventId = bevyTicketEvent.eventId();
+                final Integer ticketId = bevyTicketEvent.ticketId();
+                final String userName = bevyTicketEvent.purchaserName();
+                if (!eventIdToTicketIds.containsKey(eventId)) {
+                    eventIdToTicketIds.put(eventId, new HashSet<>());
+                }
+                eventIdToTicketIds.get(eventId).add(ticketId);
+                ticketIdsToUserNames.put(ticketId, userName);
+                ticketIdsToMessageIds.put(ticketId, messageId);
+            } catch (final JsonProcessingException exception) {
+                LOG.error("Unable to parse message {}", messageId, exception);
+                batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
+            }
+        });
 
-        final UserList userList = twitchClient.getHelix().getUsers(
-                null,
-                null,
-                ticketIdsToUserNames.values().stream().toList()).execute();
+        final List<User> users = new ArrayList<>();
+        final List<String> userNames = ticketIdsToUserNames.values().stream().toList();
+        boolean batchRequestFailed = false;
+        try {
+            final UserList userList = twitchClient.getHelix().getUsers(
+                    null,
+                    null,
+                    userNames).execute();
+            users.addAll(userList.getUsers());
+        } catch (final Exception exception) {
+            LOG.error("Unable to retrieve Twitch user ID for user names {}", userNames, exception);
+            batchRequestFailed = true;
+        }
+
+        // Batch request failed, fall back to single requests.
+        if (batchRequestFailed) {
+            userNames.forEach(userName -> {
+                try {
+                    final User user = twitchClient.getHelix()
+                            .getUsers(null, null, Collections.singletonList(userName))
+                            .execute().getUsers().getFirst();
+                    users.add(user);
+                } catch (final Exception exception) {
+                    LOG.error("Unable to retrieve Twitch user ID for user name {}", userName, exception);
+                    final Integer ticketId = ticketIdsToUserNames.inverse().get(userName);
+                    final String messageId = ticketIdsToMessageIds.get(ticketId);
+                    batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
+                }
+            });
+        }
 
         final Map<String, TwitchAccount> twitchAccounts = new HashMap<>();
 
-        userList.getUsers().forEach(user -> {
+        users.forEach(user -> {
             final TwitchAccount twitchAccount = new TwitchAccount();
             final String userName = user.getLogin();
             twitchAccount.setId(Integer.parseInt(user.getId()));
@@ -104,6 +136,7 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
                     eventRegistrations.add(eventRegistration);
                 } else {
                     LOG.error("Unable to find Twitch account ({}) for ticket {}", userName, ticketId);
+                    batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(ticketIdsToMessageIds.get(ticketId)));
                 }
             }
         }
@@ -122,7 +155,9 @@ public class BevyTicketDynamodbEventHandler implements RequestHandler<DynamodbEv
             throw new RuntimeException(exception);
         }
 
-        return null;
+        return SQSBatchResponse.builder()
+                .withBatchItemFailures(batchItemFailures)
+                .build();
     }
 
     private void persistTwitchAccounts(final Collection<TwitchAccount> twitchAccounts) {

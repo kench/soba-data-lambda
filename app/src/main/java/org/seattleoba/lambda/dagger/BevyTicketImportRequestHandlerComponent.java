@@ -9,8 +9,7 @@ import javax.inject.Singleton;
 @Singleton
 @Component(modules = {
         AwsModule.class,
-        DataModule.class,
-        TwitchModule.class})
-public interface RequestHandlerLambdaComponent {
+        DataModule.class})
+public interface BevyTicketImportRequestHandlerComponent {
     BevyTicketImportRequestHandler requestHandler();
 }

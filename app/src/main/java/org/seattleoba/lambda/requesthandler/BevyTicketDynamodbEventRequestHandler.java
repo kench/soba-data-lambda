@@ -25,6 +25,7 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
     private static final String EVENT_ID_FIELD_NAME = "event_id";
     private static final String ID_FIELD_NAME = "id";
     private static final String PURCHASER_NAME_FIELD_NAME = "purchaser_name";
+    private static final String TICKET_ID_FIELD_NAME = "ticket_id";
     private static final String REMOVE_EVENT_NAME = "REMOVE";
 
     private final ObjectMapper objectMapper;
@@ -49,10 +50,11 @@ public class BevyTicketDynamodbEventRequestHandler implements RequestHandler<Dyn
                 final String sequenceNumber = record.getDynamodb().getSequenceNumber();
                 final Map<String, AttributeValue> newImage = record.getDynamodb().getNewImage();
                 final Integer eventId = Integer.parseInt(newImage.get(EVENT_ID_FIELD_NAME).getN());
-                final Integer ticketId = Integer.parseInt(newImage.get(ID_FIELD_NAME).getN());
+                final Integer id = Integer.parseInt(newImage.get(ID_FIELD_NAME).getN());
                 final String purchaserName = newImage.get(PURCHASER_NAME_FIELD_NAME).getS();
-                bevyTicketEvents.add(new BevyTicketEvent(eventId, ticketId, purchaserName));
-                ticketIdToSequenceNumber.put(ticketId, sequenceNumber);
+                final String ticketId = newImage.get(TICKET_ID_FIELD_NAME).getS();
+                bevyTicketEvents.add(new BevyTicketEvent(eventId, id, ticketId, purchaserName));
+                ticketIdToSequenceNumber.put(id, sequenceNumber);
             }
         });
 

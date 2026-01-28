@@ -1,6 +1,6 @@
-<Configuration>
+<Configuration packages="com.amazonaws.services.lambda.runtime.log4j2">
     <Appenders>
-        <Lambda name="Lambda" format="${env:AWS_LAMBDA_LOG_FORMAT:-TEXT}">
+        <Lambda name="Lambda">
             <LambdaTextFormat>
                 <PatternLayout>
                     <pattern>%d{yyyy-MM-dd HH:mm:ss} %X{AWSRequestId} %-5p %c{1} - %m%n </pattern>
@@ -9,9 +9,9 @@
         </Lambda>
     </Appenders>
     <Loggers>
-        <Root level="${env:AWS_LAMBDA_LOG_LEVEL:-INFO}">
+        <Root level="INFO">
             <AppenderRef ref="Lambda"/>
         </Root>
-        <Logger name="org.seattleoba.lambda" level="INFO" />
+        <Logger name="org.seattleoba.lambda.requesthandler" level="INFO" />
     </Loggers>
 </Configuration>

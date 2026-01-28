@@ -56,7 +56,7 @@ public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent
                 final Integer ticketId = bevyTicketEvent.ticketId();
                 final Integer eventId = bevyTicketEvent.eventId();
                 final String purchaserName = bevyTicketEvent.purchaserName();
-                LOG.info("Started processing ticket {}, event {}. purchaserName {}",
+                LOG.info("Started processing ticket {}, event {}, purchaser {}",
                         ticketId,
                         eventId,
                         purchaserName);
@@ -76,21 +76,14 @@ public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent
                 eventRegistration.setTwitchId(twitchAccount.getId());
 
                 LOG.info("Persisting Twitch account information for {} ({})", user.getDisplayName(), user.getId());
-                final TwitchAccount twitchAccountRecord = twitchAccountTable.getItem(twitchAccount);
-                if (Objects.isNull(twitchAccountRecord)) {
-                    twitchAccountTable.putItem(twitchAccount);
-                } else if (!twitchAccount.equals(twitchAccountRecord)) {
-                    twitchAccountTable.updateItem(twitchAccount);
-                }
+                twitchAccountTable.updateItem(twitchAccount);
+                LOG.info("Persisted Twitch account information for {}", user.getDisplayName());
 
-                final EventRegistration eventRegistrationRecord = eventRegistrationTable.getItem(eventRegistration);
-                if (Objects.isNull(eventRegistrationRecord)) {
-                    eventRegistrationTable.putItem(eventRegistration);
-                } else if (!eventRegistration.equals(eventRegistrationRecord)) {
-                    eventRegistrationTable.updateItem(eventRegistration);
-                }
+                LOG.info("Persisting event registration information for {} ({})", user.getDisplayName(), ticketId);
+                eventRegistrationTable.updateItem(eventRegistration);
+                LOG.info("Persisted event registration information for {} ({})", user.getDisplayName(), ticketId);
             } catch (final Exception exception) {
-                LOG.info("Error encountered while processing message {}", messageId, exception);
+                LOG.error("Error encountered while processing message {}", messageId, exception);
                 batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
             }
         }

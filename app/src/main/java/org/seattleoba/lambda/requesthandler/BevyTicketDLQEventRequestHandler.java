@@ -95,11 +95,11 @@ public class BevyTicketDLQEventRequestHandler implements RequestHandler<Void, Be
 
         final CsvMapper mapper = new CsvMapper();
         final CsvSchema csvSchema = mapper.schemaFor(BevyTicketErrorEntry.class).withHeader();
-        final File outputFile = new File("output.csv");
+        final File outputFile = new File(String.format("/tmp/output-%d.csv", System.currentTimeMillis()));
         try (final SequenceWriter writer = mapper.writer(csvSchema).writeValues(outputFile)) {
             writer.writeAll(errorEntries);
         } catch (final IOException exception) {
-            LOG.error("Unable to write failed entries to file");
+            LOG.error("Unable to write failed entries to file", exception);
             throw new RuntimeException(exception);
         }
 

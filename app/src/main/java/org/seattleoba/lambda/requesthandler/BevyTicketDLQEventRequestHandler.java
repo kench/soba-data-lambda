@@ -24,10 +24,7 @@ import software.amazon.awssdk.services.sqs.model.*;
 import javax.inject.Inject;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class BevyTicketDLQEventRequestHandler implements RequestHandler<Void, BevyDLQReportResult> {
@@ -150,7 +147,9 @@ public class BevyTicketDLQEventRequestHandler implements RequestHandler<Void, Be
         return sqsClient.deleteMessageBatch(DeleteMessageBatchRequest.builder()
                 .entries(receiptHandles.stream()
                         .map(handle -> DeleteMessageBatchRequestEntry.builder()
-                                .receiptHandle(handle).build())
+                                .id(UUID.randomUUID().toString())
+                                .receiptHandle(handle)
+                                .build())
                         .collect(Collectors.toSet()))
                 .queueUrl(SQS_DLQ_URL)
                 .build());

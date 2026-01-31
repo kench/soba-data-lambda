@@ -39,6 +39,9 @@ dependencies {
     implementation("com.github.twitch4j:twitch4j:1.25.0")
     // Data
     implementation("org.seattleoba:soba-dataformats:1.0")
+    // Jackson for report generation
+    implementation("com.fasterxml.jackson.core:jackson-annotations:2.20")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.20.1")
     // Mockito
     testImplementation("org.mockito:mockito-core:5.21.0")
     testImplementation("org.mockito:mockito-junit-jupiter:5.21.0")

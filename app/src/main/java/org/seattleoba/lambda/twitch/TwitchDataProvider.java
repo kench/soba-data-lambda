@@ -26,7 +26,7 @@ public class TwitchDataProvider {
     }
 
     public Optional<Team> getTeam(final Integer teamId) {
-        final TeamList teamList = twitchClient.getHelix().getTeams(null, String.valueOf(teamId), null).execute();
+        final TeamList teamList = twitchClient.getHelix().getTeams(null, null, String.valueOf(teamId)).execute();
         if (teamList.getTeams().isEmpty()) {
             return Optional.empty();
         } else {

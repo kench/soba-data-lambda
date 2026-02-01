@@ -7,6 +7,7 @@ import dagger.Module;
 import dagger.Provides;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.seattleoba.lambda.twitch.TwitchDataProvider;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -72,6 +73,12 @@ public class TwitchModule {
                 .withClientId(clientId)
                 .withClientSecret(clientSecret)
                 .build();
+    }
+
+    @Provides
+    @Singleton
+    public TwitchDataProvider providesTwitchDataProvider(final TwitchClient twitchClient) {
+        return new TwitchDataProvider(twitchClient);
     }
 
     @Provides

@@ -12,6 +12,7 @@ import org.seattleoba.data.dynamodb.bean.EventRegistration;
 import org.seattleoba.data.dynamodb.bean.TwitchAccount;
 import org.seattleoba.lambda.model.BevyTicketEvent;
 import org.seattleoba.lambda.twitch.TwitchDataProvider;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 import javax.inject.Inject;
@@ -19,9 +20,10 @@ import java.util.*;
 
 public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent, SQSBatchResponse> {
     private static final Logger LOG = LogManager.getLogger(BevyTicketSQSEventRequestHandler.class);
-    private static final Integer MAX_BATCH_SIZE = 100;
+    private static final Integer MAX_BATCH_SIZE = 25;
 
     private final TwitchDataProvider twitchDataProvider;
+    private final DynamoDbEnhancedClient dynamoDbEnhancedClient;
     private final DynamoDbTable<EventRegistration> eventRegistrationTable;
     private final DynamoDbTable<TwitchAccount> twitchAccountTable;
     private final ObjectMapper objectMapper;
@@ -29,10 +31,12 @@ public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent
     @Inject
     public BevyTicketSQSEventRequestHandler(
             final TwitchDataProvider twitchDataProvider,
+            final DynamoDbEnhancedClient dynamoDbEnhancedClient,
             final DynamoDbTable<EventRegistration> eventRegistrationTable,
             final DynamoDbTable<TwitchAccount> twitchAccountTable,
             final ObjectMapper objectMapper) {
         this.twitchDataProvider = twitchDataProvider;
+        this.dynamoDbEnhancedClient = dynamoDbEnhancedClient;
         this.eventRegistrationTable = eventRegistrationTable;
         this.twitchAccountTable = twitchAccountTable;
         this.objectMapper = objectMapper;
@@ -101,39 +105,57 @@ public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent
                 });
             }
 
-            for (final String userName : userNames) {
-                final String messageId = userNameToMessageId.get(userName);
-                final BevyTicketEvent bevyTicketEvent = registrations.get(userName);
+            final Collection<EventRegistration> eventRegistrations = new HashSet<>();
+            for (final BevyTicketEvent registration : registrations.values()) {
+                final String userName = registration.purchaserName().toLowerCase(Locale.ROOT);
+                final String messageId = ticketIdToMessageId.get(registration.ticketId());
                 if (twitchAccounts.containsKey(userName)) {
                     final TwitchAccount twitchAccount = twitchAccounts.get(userName);
                     final EventRegistration eventRegistration = new EventRegistration();
-                    eventRegistration.setEventId(bevyTicketEvent.eventId());
-                    eventRegistration.setId(bevyTicketEvent.ticketId());
+                    eventRegistration.setEventId(registration.eventId());
+                    eventRegistration.setId(registration.ticketId());
                     eventRegistration.setTwitchId(twitchAccount.getId());
-                    try {
-                        twitchAccountTable.updateItem(twitchAccounts.get(userName));
-                    } catch (final Exception exception) {
-                        LOG.error("Unable to persist Twitch account information for user {}", userName);
-                        batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
-                        break;
-                    }
-                    try {
-                        eventRegistrationTable.updateItem(eventRegistration);
-                    } catch (final Exception exception) {
-                        LOG.error("Unable to persist event registration {} for user {}",
-                                bevyTicketEvent.ticketId(),
-                                userName);
-                        batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
-                    }
+                    eventRegistrations.add(eventRegistration);
                 } else {
                     LOG.error("Unable to find Twitch account for user {}", userName);
                     batchItemFailures.add(new SQSBatchResponse.BatchItemFailure(messageId));
                 }
             }
+            writeRegistrations(eventRegistrations).forEach(failedEventRegistration ->
+                    batchItemFailures.add(
+                            new SQSBatchResponse.BatchItemFailure(
+                                    ticketIdToMessageId.get(failedEventRegistration.getId()))));
+            writeTwitchAccounts(twitchAccounts.values());
         }
 
         return SQSBatchResponse.builder()
                 .withBatchItemFailures(batchItemFailures)
                 .build();
+    }
+
+    private Collection<EventRegistration> writeRegistrations(final Collection<EventRegistration> eventRegistrations) {
+        // TODO: Rewrite to use batchWriteItem API
+        final Collection<EventRegistration> failedItems = new HashSet<>();
+        for (final EventRegistration eventRegistration : eventRegistrations) {
+            try {
+                eventRegistrationTable.updateItem(eventRegistration);
+            } catch (final Exception exception) {
+                LOG.error("Unable to persist event registration {} for user {}",
+                        eventRegistration.getId(),
+                        eventRegistration.getTwitchId());
+                failedItems.add(eventRegistration);
+            }
+        }
+        return failedItems;
+    }
+
+    private void writeTwitchAccounts(final Collection<TwitchAccount> twitchAccounts) {
+        for (final TwitchAccount twitchAccount : twitchAccounts) {
+            try {
+                twitchAccountTable.updateItem(twitchAccount);
+            } catch (final Exception exception) {
+                LOG.error("Unable to persist Twitch account information for user {}", twitchAccount.getDisplayName());
+            }
+        }
     }
 }

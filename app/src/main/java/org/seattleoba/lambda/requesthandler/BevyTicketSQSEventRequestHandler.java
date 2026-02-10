@@ -14,12 +14,19 @@ import org.seattleoba.lambda.model.BevyTicketEvent;
 import org.seattleoba.lambda.twitch.TwitchDataProvider;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.model.BatchWriteResult;
+import software.amazon.awssdk.enhanced.dynamodb.model.WriteBatch;
 
 import javax.inject.Inject;
 import java.util.*;
 
 public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent, SQSBatchResponse> {
     private static final Logger LOG = LogManager.getLogger(BevyTicketSQSEventRequestHandler.class);
+    /**
+     * Maximum batch size.
+     * Twitch API supports up to 100 usernames in a single request,
+     * but DynamoDB only supports 25 operations in a single batch.
+     */
     private static final Integer MAX_BATCH_SIZE = 25;
 
     private final TwitchDataProvider twitchDataProvider;
@@ -125,7 +132,10 @@ public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent
                     batchItemFailures.add(
                             new SQSBatchResponse.BatchItemFailure(
                                     ticketIdToMessageId.get(failedEventRegistration.getId()))));
-            writeTwitchAccounts(twitchAccounts.values());
+            writeTwitchAccounts(twitchAccounts.values()).forEach(failedTwitchAccount ->
+                    batchItemFailures.add(
+                            new SQSBatchResponse.BatchItemFailure(
+                                    userNameToMessageId.get(failedTwitchAccount.getUserName()))));
         }
 
         return SQSBatchResponse.builder()
@@ -134,28 +144,36 @@ public class BevyTicketSQSEventRequestHandler implements RequestHandler<SQSEvent
     }
 
     private Collection<EventRegistration> writeRegistrations(final Collection<EventRegistration> eventRegistrations) {
-        // TODO: Rewrite to use batchWriteItem API
-        final Collection<EventRegistration> failedItems = new HashSet<>();
+        WriteBatch.Builder<EventRegistration> builder = WriteBatch.builder(EventRegistration.class)
+                .mappedTableResource(eventRegistrationTable);
         for (final EventRegistration eventRegistration : eventRegistrations) {
-            try {
-                eventRegistrationTable.updateItem(eventRegistration);
-            } catch (final Exception exception) {
-                LOG.error("Unable to persist event registration {} for user {}",
-                        eventRegistration.getId(),
-                        eventRegistration.getTwitchId());
-                failedItems.add(eventRegistration);
-            }
+            builder = builder.addPutItem(b -> b.item(eventRegistration));
         }
-        return failedItems;
+        final WriteBatch writeBatch = builder.build();
+        try {
+            final BatchWriteResult result = dynamoDbEnhancedClient.batchWriteItem(b ->
+                    b.writeBatches(writeBatch));
+            return result.unprocessedPutItemsForTable(eventRegistrationTable);
+        } catch (final Exception exception) {
+            LOG.error("Unable to perform batch write of event registrations", exception);
+            return eventRegistrations;
+        }
     }
 
-    private void writeTwitchAccounts(final Collection<TwitchAccount> twitchAccounts) {
+    private Collection<TwitchAccount> writeTwitchAccounts(final Collection<TwitchAccount> twitchAccounts) {
+        WriteBatch.Builder<TwitchAccount> builder = WriteBatch.builder(TwitchAccount.class)
+                .mappedTableResource(twitchAccountTable);
         for (final TwitchAccount twitchAccount : twitchAccounts) {
-            try {
-                twitchAccountTable.updateItem(twitchAccount);
-            } catch (final Exception exception) {
-                LOG.error("Unable to persist Twitch account information for user {}", twitchAccount.getDisplayName());
-            }
+            builder = builder.addPutItem(b -> b.item(twitchAccount));
+        }
+        final WriteBatch writeBatch = builder.build();
+        try {
+            final BatchWriteResult result = dynamoDbEnhancedClient.batchWriteItem(b ->
+                    b.writeBatches(writeBatch));
+            return result.unprocessedPutItemsForTable(twitchAccountTable);
+        } catch (final Exception exception) {
+            LOG.error("Unable to perform batch write of Twitch accounts", exception);
+            return twitchAccounts;
         }
     }
 }

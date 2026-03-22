@@ -1,0 +1,49 @@
+package org.seattleoba.lambda.requesthandler;
+
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.stripe.StripeClient;
+import com.stripe.exception.StripeException;
+import com.stripe.model.BalanceTransaction;
+import com.stripe.model.PaymentIntent;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.seattleoba.lambda.model.StripeDataSyncRequest;
+
+import javax.inject.Inject;
+
+public class StripeDataSyncRequestHandler implements RequestHandler<StripeDataSyncRequest, Void> {
+    private static final Logger LOG = LogManager.getLogger(StripeDataSyncRequestHandler.class);
+
+    private static final String BALANCE_TRANSACTION_RESOURCE_TYPE = "balance-transaction";
+    private static final String PAYMENT_INTENT_RESOURCE_TYPE = "payment-intent";
+
+    private final StripeClient stripeClient;
+
+    @Inject
+    public StripeDataSyncRequestHandler(final StripeClient stripeClient) {
+        this.stripeClient = stripeClient;
+    }
+
+    @Override
+    public Void handleRequest(final StripeDataSyncRequest input, final Context context) {
+        if (input.resourceType().equals(BALANCE_TRANSACTION_RESOURCE_TYPE)) {
+            final BalanceTransaction balanceTransaction;
+            try {
+                balanceTransaction = stripeClient.v1().balanceTransactions().retrieve(input.id());
+                LOG.info("Retrieved balance transaction {} from Stripe", balanceTransaction);
+            } catch (final StripeException exception) {
+                LOG.error("Unable to retrieve balance transaction {} from Stripe", input.id(), exception);
+            }
+        } else if (input.resourceType().equals(PAYMENT_INTENT_RESOURCE_TYPE)) {
+            final PaymentIntent paymentIntent;
+            try {
+                paymentIntent = stripeClient.v1().paymentIntents().retrieve(input.id());
+                LOG.info("Retrieved payment intent {} from Stripe", paymentIntent);
+            } catch (final StripeException exception) {
+                LOG.error("Unable to retrieve payment intent {} from Stripe", input.id(), exception);
+            }
+        }
+        return null;
+    }
+}

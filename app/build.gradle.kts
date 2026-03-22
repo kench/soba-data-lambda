@@ -37,6 +37,8 @@ dependencies {
     implementation("software.amazon.awssdk:sqs")
     // twitch4j
     implementation("com.github.twitch4j:twitch4j:1.25.0")
+    // Stripe
+    implementation("com.stripe:stripe-java:31.4.1")
     // Data
     implementation("org.seattleoba:soba-dataformats:1.0")
     // Jackson for report generation

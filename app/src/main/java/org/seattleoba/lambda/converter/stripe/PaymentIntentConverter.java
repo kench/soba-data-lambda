@@ -7,6 +7,15 @@ public final class PaymentIntentConverter {
                 input.getId(),
                 input.getLatestCharge(),
                 input.getCustomer(),
-                input.getDescription());
+                input.getDescription(),
+                input.getAmount(),
+                input.getCurrency(),
+                input.getMetadata(),
+                input.getPaymentMethod(),
+                input.getReceiptEmail(),
+                input.getStatus(),
+                input.getCreated(),
+                input.getApplication(),
+                input.getApplicationFeeAmount());
     }
 }

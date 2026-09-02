@@ -104,7 +104,7 @@ public class EventRegistrationRosterRequestHandler implements
             throw new RuntimeException(exception);
         }
 
-        final String objectKey = String.format("twitch-roster/%d.csv", System.currentTimeMillis());
+        final String objectKey = String.format("twitch-roster/%d.csv", eventId);
         final PutObjectResponse putObjectResponse;
         try {
             putObjectResponse = s3Client.putObject(PutObjectRequest.builder()

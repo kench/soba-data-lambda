@@ -1,5 +1,8 @@
 package org.seattleoba.lambda.model;
 
-public record EventRegistrationRosterRequest(
-        Integer eventId) {
-}
+/**
+ * Request to build the Twitch roster report for a Bevy event.
+ *
+ * @param eventId Bevy event ID
+ */
+public record EventRegistrationRosterRequest(Integer eventId) {}

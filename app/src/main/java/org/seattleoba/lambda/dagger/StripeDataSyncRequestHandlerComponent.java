@@ -1,17 +1,18 @@
 package org.seattleoba.lambda.dagger;
 
 import dagger.Component;
+import javax.inject.Singleton;
 import org.seattleoba.data.dagger.DataModule;
 import org.seattleoba.lambda.requesthandler.StripeDataSyncRequestHandler;
 
-import javax.inject.Singleton;
-
+/** Dagger component for {@link org.seattleoba.lambda.StripeSyncRequestHandler}. */
 @Singleton
-@Component(modules = {
-        AwsModule.class,
-        DataModule.class,
-        JacksonModule.class,
-        StripeModule.class})
+@Component(modules = {AwsModule.class, DataModule.class, JacksonModule.class, StripeModule.class})
 public interface StripeDataSyncRequestHandlerComponent {
-    StripeDataSyncRequestHandler requestHandler();
+  /**
+   * Returns the request handler.
+   *
+   * @return the handler
+   */
+  StripeDataSyncRequestHandler requestHandler();
 }

@@ -5,64 +5,82 @@ import com.github.twitch4j.helix.domain.Team;
 import com.github.twitch4j.helix.domain.TeamList;
 import com.github.twitch4j.helix.domain.User;
 import com.github.twitch4j.helix.domain.UserList;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.seattleoba.data.dynamodb.bean.TwitchAccount;
-
-import javax.inject.Inject;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.inject.Inject;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.seattleoba.data.dynamodb.bean.TwitchAccount;
 
+/** Wrapper around the Twitch Helix API that returns SOBA DynamoDB beans. */
 public class TwitchDataProvider {
-    private static final Logger LOG = LogManager.getLogger(TwitchDataProvider.class);
+  private static final Logger LOG = LogManager.getLogger(TwitchDataProvider.class);
 
-    private final TwitchClient twitchClient;
+  private final TwitchClient twitchClient;
 
-    @Inject
-    public TwitchDataProvider(final TwitchClient twitchClient) {
-        this.twitchClient = twitchClient;
+  /**
+   * Creates the provider.
+   *
+   * @param twitchClient Twitch client with Helix enabled
+   */
+  @Inject
+  public TwitchDataProvider(final TwitchClient twitchClient) {
+    this.twitchClient = twitchClient;
+  }
+
+  /**
+   * Looks up a Twitch team.
+   *
+   * @param teamId Twitch team ID
+   * @return the team, or empty if Twitch doesn't know it
+   */
+  public Optional<Team> getTeam(final Integer teamId) {
+    final TeamList teamList =
+        twitchClient.getHelix().getTeams(null, null, String.valueOf(teamId)).execute();
+    if (teamList.getTeams().isEmpty()) {
+      return Optional.empty();
+    } else {
+      return Optional.of(teamList.getTeams().getFirst());
     }
+  }
 
-    public Optional<Team> getTeam(final Integer teamId) {
-        final TeamList teamList = twitchClient.getHelix().getTeams(null, null, String.valueOf(teamId)).execute();
-        if (teamList.getTeams().isEmpty()) {
-            return Optional.empty();
-        } else {
-            return Optional.of(teamList.getTeams().getFirst());
-        }
-    }
+  /**
+   * Looks up Twitch accounts by user ID.
+   *
+   * @param userIds up to 100 Twitch user IDs
+   * @return the accounts Twitch returned
+   */
+  public Collection<TwitchAccount> getTwitchAccountsByUserIds(final List<Integer> userIds) {
+    final UserList userList =
+        twitchClient
+            .getHelix()
+            .getUsers(null, userIds.stream().map(String::valueOf).toList(), null)
+            .execute();
+    return userList.getUsers().stream().map(this::getTwitchAccount).collect(Collectors.toList());
+  }
 
-    public Collection<TwitchAccount> getTwitchAccountsByUserIds(final List<Integer> userIds) {
-        final UserList userList = twitchClient.getHelix().getUsers(
-                null,
-                userIds.stream().map(String::valueOf).toList(),
-                null).execute();
-        return userList.getUsers().stream()
-                .map(this::getTwitchAccount)
-                .collect(Collectors.toList());
-    }
+  /**
+   * Looks up Twitch accounts by login name.
+   *
+   * @param userNames up to 100 Twitch logins
+   * @return the accounts Twitch returned
+   */
+  public Collection<TwitchAccount> getTwitchAccountsByUserNames(final List<String> userNames) {
+    final UserList userList = twitchClient.getHelix().getUsers(null, null, userNames).execute();
+    return userList.getUsers().stream().map(this::getTwitchAccount).collect(Collectors.toList());
+  }
 
-    public Collection<TwitchAccount> getTwitchAccountsByUserNames(final List<String> userNames) {
-        final UserList userList = twitchClient.getHelix().getUsers(
-                null,
-                null,
-                userNames).execute();
-        return userList.getUsers().stream()
-                .map(this::getTwitchAccount)
-                .collect(Collectors.toList());
-    }
-
-    private TwitchAccount getTwitchAccount(final User user) {
-        final TwitchAccount twitchAccount = new TwitchAccount();
-        twitchAccount.setId(Integer.parseInt(user.getId()));
-        twitchAccount.setUserName(user.getLogin());
-        twitchAccount.setDisplayName(user.getDisplayName());
-        twitchAccount.setUserType(user.getType());
-        twitchAccount.setBroadcasterType(user.getBroadcasterType());
-        twitchAccount.setDescription(user.getDescription());
-        twitchAccount.setCreatedAt(user.getCreatedAt().toEpochMilli());
-        return twitchAccount;
-    }
+  private TwitchAccount getTwitchAccount(final User user) {
+    final TwitchAccount twitchAccount = new TwitchAccount();
+    twitchAccount.setId(Integer.parseInt(user.getId()));
+    twitchAccount.setUserName(user.getLogin());
+    twitchAccount.setDisplayName(user.getDisplayName());
+    twitchAccount.setUserType(user.getType());
+    twitchAccount.setBroadcasterType(user.getBroadcasterType());
+    twitchAccount.setDescription(user.getDescription());
+    twitchAccount.setCreatedAt(user.getCreatedAt().toEpochMilli());
+    return twitchAccount;
+  }
 }

@@ -7,11 +7,27 @@ import com.amazonaws.services.lambda.runtime.events.StreamsEventResponse;
 import org.seattleoba.lambda.dagger.BevyTicketDynamodbEventHandlerComponent;
 import org.seattleoba.lambda.dagger.DaggerBevyTicketDynamodbEventHandlerComponent;
 
-public class DynamoDbEventRequestHandler implements RequestHandler<DynamodbEvent, StreamsEventResponse> {
-    private final BevyTicketDynamodbEventHandlerComponent lambdaComponent = DaggerBevyTicketDynamodbEventHandlerComponent.create();
+/** Lambda entry point for the BevyTickets DynamoDB stream. */
+public class DynamoDbEventRequestHandler
+    implements RequestHandler<DynamodbEvent, StreamsEventResponse> {
+  private final BevyTicketDynamodbEventHandlerComponent lambdaComponent;
 
-    @Override
-    public StreamsEventResponse handleRequest(final DynamodbEvent input, final Context context) {
-        return lambdaComponent.requestHandler().handleRequest(input, context);
-    }
+  /** Creates the handler with its production dependency graph. */
+  public DynamoDbEventRequestHandler() {
+    this(DaggerBevyTicketDynamodbEventHandlerComponent.create());
+  }
+
+  /**
+   * Creates the handler with the given dependency graph.
+   *
+   * @param lambdaComponent Dagger component that provides the request handler
+   */
+  DynamoDbEventRequestHandler(final BevyTicketDynamodbEventHandlerComponent lambdaComponent) {
+    this.lambdaComponent = lambdaComponent;
+  }
+
+  @Override
+  public StreamsEventResponse handleRequest(final DynamodbEvent input, final Context context) {
+    return lambdaComponent.requestHandler().handleRequest(input, context);
+  }
 }

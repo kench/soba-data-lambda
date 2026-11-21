@@ -1,14 +1,17 @@
 package org.seattleoba.lambda.dagger;
 
 import dagger.Component;
+import javax.inject.Singleton;
 import org.seattleoba.lambda.requesthandler.BevyTicketDynamodbEventRequestHandler;
 
-import javax.inject.Singleton;
-
+/** Dagger component for {@link org.seattleoba.lambda.DynamoDbEventRequestHandler}. */
 @Singleton
-@Component(modules = {
-        AwsModule.class,
-        JacksonModule.class})
+@Component(modules = {AwsModule.class, JacksonModule.class})
 public interface BevyTicketDynamodbEventHandlerComponent {
-    BevyTicketDynamodbEventRequestHandler requestHandler();
+  /**
+   * Returns the request handler.
+   *
+   * @return the handler
+   */
+  BevyTicketDynamodbEventRequestHandler requestHandler();
 }

@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -25,9 +28,16 @@ jobs:
           distribution: 'corretto'
           java-version: '25'
           cache: 'gradle'
-      - name: Build Lambda function code
-        run: 'gradle build -i'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+      - name: Build Lambda function code (tests, 90% coverage gate, Spotless and Checkstyle)
+        run: './gradlew build -i'
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: app/build/reports/jacoco/test/html

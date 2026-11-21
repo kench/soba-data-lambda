@@ -1,4 +1,8 @@
 package org.seattleoba.lambda.model;
 
-public record TwitchAccountSyncResult(Integer recordsUpdated) {
-}
+/**
+ * Result of a Twitch account sync.
+ *
+ * @param recordsUpdated number of Twitch accounts refreshed
+ */
+public record TwitchAccountSyncResult(Integer recordsUpdated) {}

@@ -11,12 +11,14 @@ import com.amazonaws.services.lambda.runtime.events.DynamodbEvent;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.amazonaws.services.lambda.runtime.events.StreamsEventResponse;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.seattleoba.lambda.dagger.BevyTicketDlqRequestHandlerComponent;
 import org.seattleoba.lambda.dagger.BevyTicketDynamodbEventHandlerComponent;
 import org.seattleoba.lambda.dagger.BevyTicketImportRequestHandlerComponent;
 import org.seattleoba.lambda.dagger.BevyTicketSqsEventRequestHandlerComponent;
 import org.seattleoba.lambda.dagger.EventRegistrationRosterRequestHandlerComponent;
+import org.seattleoba.lambda.dagger.StripeBackfillRequestHandlerComponent;
 import org.seattleoba.lambda.dagger.StripeDataSyncRequestHandlerComponent;
 import org.seattleoba.lambda.dagger.StripeEventSqsRequestHandlerComponent;
 import org.seattleoba.lambda.dagger.TwitchAccountSyncRequestHandlerComponent;
@@ -26,6 +28,8 @@ import org.seattleoba.lambda.model.BevyRosterImportRequest;
 import org.seattleoba.lambda.model.BevyRosterImportResult;
 import org.seattleoba.lambda.model.EventRegistrationRosterRequest;
 import org.seattleoba.lambda.model.EventRegistrationRosterResult;
+import org.seattleoba.lambda.model.StripeBackfillRequest;
+import org.seattleoba.lambda.model.StripeBackfillResult;
 import org.seattleoba.lambda.model.StripeDataSyncRequest;
 import org.seattleoba.lambda.model.TwitchAccountSyncResult;
 import org.seattleoba.lambda.model.TwitchTeamImportRequest;
@@ -42,6 +46,7 @@ class EntryPointsTest {
     assertNotNull(new DynamoDbEventRequestHandler());
     assertNotNull(new EventRegistrationRosterRequestHandler());
     assertNotNull(new SqsEventRequestHandler());
+    assertNotNull(new StripeBackfillRequestHandler());
     assertNotNull(new StripeEventRequestHandler());
     assertNotNull(new StripeSyncRequestHandler());
     assertNotNull(new TeamImportRequestHandler());
@@ -97,6 +102,16 @@ class EntryPointsTest {
     when(component.requestHandler().handleRequest(event, context)).thenReturn(result);
 
     assertSame(result, new SqsEventRequestHandler(component).handleRequest(event, context));
+  }
+
+  @Test
+  void stripeBackfillDelegates() {
+    final var component = mock(StripeBackfillRequestHandlerComponent.class, RETURNS_DEEP_STUBS);
+    final StripeBackfillRequest request = new StripeBackfillRequest(null, null, null, null);
+    final StripeBackfillResult result = new StripeBackfillResult(true, Map.of(), 0, null);
+    when(component.requestHandler().handleRequest(request, context)).thenReturn(result);
+
+    assertSame(result, new StripeBackfillRequestHandler(component).handleRequest(request, context));
   }
 
   @Test

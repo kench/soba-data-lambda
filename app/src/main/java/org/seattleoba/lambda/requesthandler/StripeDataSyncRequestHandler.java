@@ -51,54 +51,45 @@ public class StripeDataSyncRequestHandler implements RequestHandler<StripeDataSy
 
     @Override
     public Void handleRequest(final StripeDataSyncRequest input, final Context context) {
-        switch (input.resourceType()) {
-            case BALANCE_TRANSACTION_RESOURCE_TYPE -> {
-                final BalanceTransaction balanceTransaction;
-                try {
-                    balanceTransaction = stripeClient.v1().balanceTransactions().retrieve(input.id());
-                    stripeBalanceTransactionStore.updateBalanceTransaction(BalanceTransactionConverter.convert(balanceTransaction));
-                } catch (final StripeException exception) {
-                    LOG.error("Unable to retrieve balance transaction {} from Stripe", input.id(), exception);
-                }
-            }
-            case CHARGE_RESOURCE_TYPE -> {
-                final Charge charge;
-                try {
-                    charge = stripeClient.v1().charges().retrieve(input.id());
-                    stripeChargeStore.updateCharge(ChargeConverter.convert(charge));
-                } catch (final StripeException exception) {
-                    LOG.error("Unable to retrieve charge {} from Stripe", input.id(), exception);
-                }
-            }
-            case CUSTOMER_RESOURCE_TYPE -> {
-                final Customer customer;
-                try {
-                    customer = stripeClient.v1().customers().retrieve(input.id());
-                    stripeCustomerStore.updateCustomer(CustomerConverter.convert(customer));
-                } catch (final StripeException exception) {
-                    LOG.error("Unable to retrieve customer {} from Stripe", input.id(), exception);
-                }
-            }
-            case PAYMENT_INTENT_RESOURCE_TYPE -> {
-                final PaymentIntent paymentIntent;
-                try {
-                    paymentIntent = stripeClient.v1().paymentIntents().retrieve(input.id());
-                    stripePaymentIntentStore.updatePaymentIntent(PaymentIntentConverter.convert(paymentIntent));
-                } catch (final StripeException exception) {
-                    LOG.error("Unable to retrieve payment intent {} from Stripe", input.id(), exception);
-                }
-            }
-            case REFUND_RESOURCE_TYPE -> {
-                final Refund refund;
-                try {
-                    refund = stripeClient.v1().refunds().retrieve(input.id());
-                    stripeRefundStore.updateRefund(RefundConverter.convert(refund));
-                } catch (final StripeException exception) {
-                    LOG.error("Unable to retrieve refund {} from Stripe", input.id(), exception);
-                }
-            }
-            default -> throw new IllegalArgumentException(String.format("Unknown resource type", input.resourceType()));
+        try {
+            sync(input.resourceType(), input.id());
+        } catch (final StripeException exception) {
+            LOG.error("Unable to retrieve {} {} from Stripe", input.resourceType(), input.id(), exception);
         }
         return null;
+    }
+
+    /**
+     * Fetches the latest copy of a Stripe resource and writes it to its DynamoDB table.
+     *
+     * @param resourceType one of the hyphenated resource types, e.g. "payment-intent"
+     * @param id Stripe object ID
+     * @throws StripeException if the resource cannot be retrieved from Stripe
+     * @throws IllegalArgumentException if the resource type is not supported
+     */
+    public void sync(final String resourceType, final String id) throws StripeException {
+        switch (resourceType) {
+            case BALANCE_TRANSACTION_RESOURCE_TYPE -> {
+                final BalanceTransaction balanceTransaction = stripeClient.v1().balanceTransactions().retrieve(id);
+                stripeBalanceTransactionStore.updateBalanceTransaction(BalanceTransactionConverter.convert(balanceTransaction));
+            }
+            case CHARGE_RESOURCE_TYPE -> {
+                final Charge charge = stripeClient.v1().charges().retrieve(id);
+                stripeChargeStore.updateCharge(ChargeConverter.convert(charge));
+            }
+            case CUSTOMER_RESOURCE_TYPE -> {
+                final Customer customer = stripeClient.v1().customers().retrieve(id);
+                stripeCustomerStore.updateCustomer(CustomerConverter.convert(customer));
+            }
+            case PAYMENT_INTENT_RESOURCE_TYPE -> {
+                final PaymentIntent paymentIntent = stripeClient.v1().paymentIntents().retrieve(id);
+                stripePaymentIntentStore.updatePaymentIntent(PaymentIntentConverter.convert(paymentIntent));
+            }
+            case REFUND_RESOURCE_TYPE -> {
+                final Refund refund = stripeClient.v1().refunds().retrieve(id);
+                stripeRefundStore.updateRefund(RefundConverter.convert(refund));
+            }
+            default -> throw new IllegalArgumentException(String.format("Unknown resource type %s", resourceType));
+        }
     }
 }

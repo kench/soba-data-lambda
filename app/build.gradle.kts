@@ -40,7 +40,7 @@ dependencies {
     // Stripe
     implementation("com.stripe:stripe-java:31.4.1")
     // Data
-    implementation("org.seattleoba:soba-dataformats:1.0")
+    implementation("org.seattleoba:soba-dataformats:1.1")
     // Jackson for report generation
     implementation("com.fasterxml.jackson.core:jackson-annotations:2.20")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.20.1")

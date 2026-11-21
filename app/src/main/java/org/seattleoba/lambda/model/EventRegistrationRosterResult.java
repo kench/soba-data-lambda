@@ -1,4 +1,8 @@
 package org.seattleoba.lambda.model;
 
-public record EventRegistrationRosterResult(Integer recordsProcessed) {
-}
+/**
+ * Result of an event registration roster report.
+ *
+ * @param recordsProcessed number of registrations in the report
+ */
+public record EventRegistrationRosterResult(Integer recordsProcessed) {}

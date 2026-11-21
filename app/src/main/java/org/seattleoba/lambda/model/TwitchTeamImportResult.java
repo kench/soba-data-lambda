@@ -1,4 +1,8 @@
 package org.seattleoba.lambda.model;
 
-public record TwitchTeamImportResult(Integer recordsImported) {
-}
+/**
+ * Result of a Twitch team import.
+ *
+ * @param recordsImported number of team members imported
+ */
+public record TwitchTeamImportResult(Integer recordsImported) {}

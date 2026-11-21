@@ -6,11 +6,26 @@ import org.seattleoba.lambda.dagger.DaggerTwitchAccountSyncRequestHandlerCompone
 import org.seattleoba.lambda.dagger.TwitchAccountSyncRequestHandlerComponent;
 import org.seattleoba.lambda.model.TwitchAccountSyncResult;
 
+/** Lambda entry point that refreshes stored Twitch accounts. */
 public class AccountSyncRequestHandler implements RequestHandler<Void, TwitchAccountSyncResult> {
-    private final TwitchAccountSyncRequestHandlerComponent lambdaComponent = DaggerTwitchAccountSyncRequestHandlerComponent.create();
+  private final TwitchAccountSyncRequestHandlerComponent lambdaComponent;
 
-    @Override
-    public TwitchAccountSyncResult handleRequest(final Void unused, final Context context) {
-        return lambdaComponent.requestHandler().handleRequest(unused, context);
-    }
+  /** Creates the handler with its production dependency graph. */
+  public AccountSyncRequestHandler() {
+    this(DaggerTwitchAccountSyncRequestHandlerComponent.create());
+  }
+
+  /**
+   * Creates the handler with the given dependency graph.
+   *
+   * @param lambdaComponent Dagger component that provides the request handler
+   */
+  AccountSyncRequestHandler(final TwitchAccountSyncRequestHandlerComponent lambdaComponent) {
+    this.lambdaComponent = lambdaComponent;
+  }
+
+  @Override
+  public TwitchAccountSyncResult handleRequest(final Void unused, final Context context) {
+    return lambdaComponent.requestHandler().handleRequest(unused, context);
+  }
 }
